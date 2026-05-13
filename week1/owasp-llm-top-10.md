@@ -90,3 +90,47 @@ Even with a proper configuration, the risk still exists — it is just less prob
 How do attackers actually carry out inversion attacks? How do they reconcile or piece together data such that federated learning and differential privacy became necessary defenses?
 
 **Surface-level answer (to investigate deeper in Week 3 with Garak):** Model inversion attacks query the model repeatedly and use the outputs to reconstruct training data. Membership inference is the simpler cousin — determining whether a specific record was in the training set. Both work because models partially memorize, especially on rare or unique data points. Differential privacy bounds the contribution of any single training example, so even with unlimited queries the attacker cannot isolate one person's data. Federated learning prevents raw data from ever leaving the user's device. Stack them and you reduce both exposure (FL) and reconstructability (DP).
+
+
+## LLM03: Supply Chain
+
+The LLM supply chain is not exempt from supply chain vulnerabilities. When we talk about supply chain, we mean the various components involved in producing and running a model — if any of them is compromised, that becomes problematic not just for the provider but also for the downstream user running it in production.
+
+### Components in the LLM supply chain
+
+- **Base model** — e.g. Meta Llama, OpenAI models, models hosted on Hugging Face
+- **Fine-tuning and training datasets** — including techniques like LoRA (Low-Rank Adaptation) and other Parameter-Efficient Fine-Tuning methods
+- **Software dependencies and runtime stack** — vLLM, Python, LangChain, and the broader set of libraries that let the model run, serve, and communicate over the internet
+
+### Categories of risk
+
+**Traditional third-party package vulnerability:** Even if you have a secure model, it still runs on a stack of dependencies — Python, C++ libraries, framework code. A bug in any dependency can give an attacker a path into the LLM application. This is why LLM applications are best described as a stack of dependencies, not a single artifact.
+
+**Licensing risk:** AI development requires pulling data and code from many sources. Most code on GitHub is open source, but open source is not public domain — it comes with licenses. The GPL (General Public License) is particularly dangerous because of its copyleft clause: if you incorporate GPL code into your model or product, you can be legally compelled to release your own source code under the same license. Dataset licenses carry similar contamination risks.
+
+**Outdated or deprecated models:** The market is flooded with models, and it is hard to tell which are still maintained. Users often confuse availability with choice. Outdated or deprecated models are already a security risk because they no longer receive patches for newly discovered vulnerabilities.
+
+**Weak model provenance:** Model provenance means tracing where a model came from and verifying its integrity. Provenance in AI is currently very weak. Hugging Face offers model cards that describe the provider, training process, and intended use — but model cards are metadata, not cryptographic proof. There is no widespread signing or hashing standard that lets a downstream user verify that the weights they downloaded are the weights the provider released.
+
+**Vulnerable LoRA adapters:** Retraining a full model is expensive and resource-intensive, so LoRA adapters have become popular — you train a small adapter layer and insert it into the base model to teach it new behavior. This saves cost and avoids breaking the base model. The downside is that a compromised adapter can compromise the entire model, and adapters are often shared casually online without integrity checks.
+
+**Malicious model weights:** Pre-trained model files (`.pt`, `.bin`, pickle-based formats) are not just data — when loaded by frameworks like PyTorch, they can execute arbitrary code via pickle deserialization. Downloading a poisoned model from a public registry is the LLM equivalent of pulling a malicious npm package.
+
+### Real world examples
+
+- **PoisonGPT (2023)** — Researchers at Mithril Security demonstrated this by uploading a subtly poisoned model to Hugging Face that gave deliberately wrong answers on specific topics. The point was to prove that model hubs have no integrity verification — anyone can upload a tampered model with a clean-looking model card.
+- **Malicious pickle files in model weights** — Repeated incidents of `.bin` and `.pt` files on Hugging Face containing embedded code that executes on load, exploiting Python's unsafe pickle deserialization.
+
+### Prevention and mitigation strategies
+
+**Red team third-party models before adoption:** Trust benchmarks are useful but bypassable. Carry out adversarial testing on any third-party model before integrating it into production, especially if it will handle sensitive workflows.
+
+**Vet data sources and suppliers:** Read their terms and conditions, assess their security posture, review their privacy policies, and check their incident history. This is standard third-party risk management applied to AI suppliers.
+
+**Maintain a Software Bill of Materials (SBOM):** An accurate, signed inventory of every model, dataset, adapter, and dependency in your stack. SBOMs let you respond quickly to newly disclosed vulnerabilities and zero-days, because you know exactly what you have.
+
+**Verify model integrity:** Because provenance standards are weak, only use models from verifiable or reputable sources, and apply your own integrity checks — file hashes, signature verification, and where possible, loading models in sandboxed environments to limit blast radius from malicious weights.
+
+### Open question for me
+
+How does the AI/ML community plan to solve the model provenance problem long-term? Are there efforts like Sigstore-for-models, signed model cards, or any cryptographic standard emerging? Revisit when I look at Hugging Face's security tooling in Week 2.
