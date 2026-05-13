@@ -134,3 +134,50 @@ The LLM supply chain is not exempt from supply chain vulnerabilities. When we ta
 ### Open question for me
 
 How does the AI/ML community plan to solve the model provenance problem long-term? Are there efforts like Sigstore-for-models, signed model cards, or any cryptographic standard emerging? Revisit when I look at Hugging Face's security tooling in Week 2.
+
+
+## LLM04: Data and Model Poisoning
+
+Data poisoning is an attack vector that degrades the integrity of a model and its ability to make accurate predictions. The attack typically targets one of three stages in the LLM lifecycle: pre-training, fine-tuning, and embedding generation.
+
+The risk is highest during pre-training because the model is being fed trillions of tokens from books, repositories, code, and scraped web content. If any of those external data sources has been altered by a malicious actor, the model learns from the poisoned data along with everything else.
+
+Beyond data poisoning, **model poisoning** is also a concern — especially given the prevalence of open-source platforms where pre-trained models are shared. Malware can be embedded in model files through techniques like malicious pickle deserialization (discussed in LLM03). Once the model is loaded, the malware executes — it can run harmful code or open a backdoor. The user may not even notice, because the malicious payload can behave like a sleeper agent waiting for a trigger.
+
+### Common attack techniques
+
+**Compromised external data sources:** When data is scraped for training, harmful or biased content gets pulled in along with the legitimate data. The model learns the biases and reproduces them at inference.
+
+**Split-view data poisoning:** The attacker identifies a data source — usually a website — that is already on a trusted crawl list or is expected to be crawled. When a curator or safety filter checks the page, it serves clean content. Once the page is approved and ingested into training, the attacker reverts it to malicious content, sometimes embedding a backdoor.
+
+**Frontrunning poisoning (snapshot attack):** The attacker knows when a model's training data snapshot will be taken from a given source (e.g. Wikipedia is scraped on a known schedule). A day or hours before the snapshot, the attacker alters the content to introduce poisoned data, degrading accuracy on specific topics the attacker chose.
+
+**User-supplied data leakage into training:** Users unknowingly inject sensitive or proprietary information during interaction, and that input later ends up in training data for the next model version. The Samsung source code leak covered in LLM02 is an example of how this realizes risk.
+
+**Unverified training data:** Without provenance checks, bias and inaccuracy creep in. Knowing the source of data doesn't guarantee it's safe, but it lets you classify and apply different trust levels. Security is layered, not a single hardening control.
+
+**Insufficient infrastructure controls:** Without limits on what data sources a model or training pipeline can reach, the system may ingest data from unintended or untrusted sources.
+
+### Prevention and mitigation strategies
+
+**Data version control (DVC):** Track changes to training data so manipulation can be detected and rolled back.
+
+**Store user-supplied content in a vector database:** Allows adjustments and corrections without full model retraining, and isolates user content from the base training set.
+
+**Track data origins and transformations:** Use tools like OWASP CycloneDX or ML-BOM to maintain provenance records across the entire model development pipeline. Verify data legitimacy at every stage.
+
+**Vet data vendors and validate outputs:** Apply rigorous vendor due diligence. Validate model outputs against trusted reference sources to detect signs of poisoning.
+
+**Infrastructure-level controls:** Apply least privilege and access control so the model and training pipeline can only reach the data sources they're supposed to.
+
+### Real world examples
+
+- **Microsoft Tay (2016)** — Microsoft released Tay, an AI chatbot designed to learn from Twitter interactions. Within 24 hours, coordinated users fed it hateful and racist content, and it began producing the same. A canonical example of poisoning via interactive learning loops.
+- **Nightshade (2024)** — University of Chicago researchers built a tool that lets artists poison image training datasets, causing models trained on the data to misclassify or degrade. Demonstrated that poisoning frontier models with relatively small amounts of crafted data is feasible.
+- **Carlini et al. (2023)** — Demonstrated that an attacker with as little as $60 could poison a non-trivial fraction of LAION-400M-style web-scale datasets by purchasing expired domains that had been crawled into the dataset's URL list. Showed that web-scale training is economically vulnerable to poisoning.
+
+### Open question for me
+
+Since data can be poisoned, shouldn't we have data brokers specializing in curated training data? Wouldn't that reduce the risk?
+
+**Surface-level answer (to revisit in Week 3):** This model partially exists — companies like Scale AI and Surge AI operate as curated training data vendors. But it doesn't solve the problem for two reasons. First, even curated pipelines can be poisoned upstream (Split-view, Frontrunning, compromised contributors). Second, frontier model training requires web-scale data — billions to trillions of tokens — that no single broker can supply, which pushes labs back to scraping. Brokers reduce risk for fine-tuning and domain-specific training but don't fix the pre-training problem.
