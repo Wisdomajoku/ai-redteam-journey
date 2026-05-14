@@ -314,3 +314,60 @@ System prompts typically specify three things:
 Do production systems use dual-model verification widely? How costly is it in practice (latency, token spend), and where does the cost-benefit make sense?
 
 **Surface-level answer to revisit in Week 3:** Yes, the pattern exists and is often called LLM-as-judge or dual-model verification. Major labs use it: OpenAI's moderation API, Anthropic's classifier models for harm detection, and frameworks like NVIDIA NeMo Guardrails operationalize it. Cost is roughly 1.5 to 2 times the token spend and 1.5 to 2 times the latency of a single-model setup, depending on whether the judge runs in parallel or serial. For high-stakes domains (medical, legal, financial) the cost is justified. For low-stakes chatbots, simpler regex-based output filters and instruction hierarchy usually suffice. The harder question is whether the judge model itself can be jailbroken through the primary model's output, which becomes a research topic in Week 3 PyRIT work.
+
+
+## LLM08: Vector and Embedding Weaknesses
+
+This vulnerability category covers the security of the retrieval layer in RAG (Retrieval Augmented Generation) systems. Before defining the risks, the components:
+
+**Embedding** is the process of converting text (or images, audio, code) into a high-dimensional numerical vector that captures the semantic meaning of the input. Two pieces of text with similar meaning produce vectors close to each other in that high-dimensional space.
+
+**Vector** is the resulting numerical representation. Modern embedding models produce vectors with hundreds to thousands of dimensions (768, 1536, 3072 are common).
+
+**Vector database** is the storage and indexing system that holds these embeddings and allows semantic search. Examples: Pinecone, Weaviate, Qdrant, pgvector. The database computes distance between a query vector and stored vectors to find the most semantically similar items.
+
+**RAG** is the architectural pattern of "the LLM looking things up." When a user asks a question, the application turns the question into a query vector, retrieves the most relevant stored vectors (and the source text they map to), and feeds that retrieved context to the LLM. The LLM answers using both the user query and the retrieved context.
+
+When any of these layers is weak, the system inherits new attack surfaces. The most common framing: vector and embedding weaknesses are storage and retrieval weaknesses, with one extra category specific to the embedding model itself.
+
+### Common attack categories
+
+**Unauthorized access to embeddings.** If the vector database is not configured with row-level or namespace-level access control, any authenticated user (or an attacker with credentials) can retrieve any vector. In multi-tenant systems this is catastrophic: one customer's embeddings become searchable by another customer.
+
+**Over-retrieval in multi-tenant systems.** A subtle variant of the above. The database returns vectors from another tenant's account because identity scoping happens after the top-K similarity search instead of within it. The fix is to bake the tenant filter into the search itself, using namespace partitioning or metadata filtering at the index level.
+
+**Embedding inversion attacks.** An attacker who obtains raw vectors can use a reverse model (often the same embedding model run in inverse, or a learned decoder) to reconstruct approximate source text from the vector. Even without direct access to original documents, the inversion gives the attacker enough fidelity to extract sensitive content. Think of it as decompressing a compressed file: the embedding is a lossy compression of meaning, and the lossy version is still readable.
+
+**RAG poisoning.** The attacker injects malicious documents into a source that the RAG pipeline ingests. When the application embeds and stores those documents, a poisoned vector lands in the database. Later, a legitimate user query semantically matches the poisoned vector, retrieving the attacker's content. The LLM treats retrieved content as authoritative context and follows whatever instructions or misinformation the attacker planted. This is indirect prompt injection (LLM01) delivered through the retrieval layer.
+
+**Embedding model attacks.** The embedding model itself can be poisoned through supply chain compromise (LLM03 territory). A backdoored embedding model can produce vectors that, for certain trigger inputs, land in attacker-controlled regions of vector space, causing the retriever to return attacker-controlled documents. This attack surface is underdiscussed but real, especially given how common it is to use third-party embedding models from Hugging Face without verification.
+
+### Prevention and mitigation strategies
+
+**Access control at the retrieval layer, not the LLM layer.** Identity verification must happen during vector search, not after. The vector database should treat unscoped queries the way a SQL database treats unparameterized inputs: as a misuse. Use namespace partitioning for tenant isolation, metadata filtering for role-based access, and row-level security where supported.
+
+**Data tagging and classification on ingestion.** Tag every piece of data with its source, sensitivity level, intended audience, and owning tenant before embedding and storing it. The retrieval layer uses these tags to enforce access. Classification can be human-driven for small datasets or rule-based and ML-driven for larger pipelines, but it must happen and must be reliable.
+
+**Source validation before ingestion.** Before any new content becomes a vector in the database, validate the source. Authenticate the origin, scan for embedded instructions or hidden text, and treat ingested content as untrusted until verified. PoisonedRAG-style attacks succeed precisely because pipelines treat scraped content as authoritative.
+
+**Verify and monitor the embedding model.** Use embedding models from reputable sources, apply integrity checks (file hashes, signatures), and monitor for unusual embedding patterns that might indicate a backdoored model. Run sample inputs periodically and compare against expected outputs.
+
+**Defense in depth.** No single mitigation closes all the gaps. Access control plus source validation plus embedding model integrity plus output filtering. None alone is sufficient. The combination raises attacker cost meaningfully but does not eliminate risk. RAG security is managed, not solved.
+
+### Real world examples
+
+**PoisonedRAG (2024-2025 research):** Multiple research groups demonstrated that if an AI system scrapes the web for its RAG ingestion pipeline, an attacker can place hidden or invisible text on a target webpage. The RAG pipeline ingests the poisoned content, treats it as a trusted fact, and the LLM begins giving users attacker-crafted instructions. The attack works because the ingestion layer did not authenticate or validate the content.
+
+**Multi-tenant vector database over-retrieval (2024):** Researchers found that certain vector databases used in multi-tenant SaaS products allowed cross-tenant retrieval. A user could submit a query and receive vectors from another customer's data because the access check happened after the top-K search instead of inside it. Fixed in subsequent releases, but the pattern recurred across multiple vendors.
+
+### Open question for me
+
+Is per-query identity verification at the retrieval layer practical at scale, given that RAG is often used for specialized high-throughput tasks?
+
+**Surface-level answer to revisit in Week 3:** Yes, and it is not optional for any multi-tenant or role-based system. Three angles.
+
+**Security angle:** RAG without per-query identity verification is broken. The over-retrieval class of attack happens precisely because identity is not enforced at the vector-search layer. Zero trust is non-negotiable; every query must be scoped to what the requesting identity is authorized to retrieve. The vector store should treat identity-stripped queries the same way a SQL database treats unparameterized inputs.
+
+**Efficiency angle:** Modern vector databases (Pinecone, Weaviate, Qdrant, pgvector) implement scoped retrieval efficiently through namespace partitioning and metadata filtering applied within the approximate nearest neighbor search. Overhead is typically 5 to 15 percent, which is acceptable for almost any production workload. The cost is far below the cost of a multi-tenant breach.
+
+**Architectural angle:** Identity verification should not live in the LLM. The LLM can be prompt-injected, has no reliable way to verify identity, and is the wrong layer for access control. Push enforcement down to the retrieval layer: the application authenticates the user, constructs scoped queries, and the LLM only ever consumes pre-filtered context. Defense in depth requires multiple layers, and the retrieval layer is the natural one for access control.
