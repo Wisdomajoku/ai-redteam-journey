@@ -181,3 +181,50 @@ Beyond data poisoning, **model poisoning** is also a concern — especially give
 Since data can be poisoned, shouldn't we have data brokers specializing in curated training data? Wouldn't that reduce the risk?
 
 **Surface-level answer (to revisit in Week 3):** This model partially exists — companies like Scale AI and Surge AI operate as curated training data vendors. But it doesn't solve the problem for two reasons. First, even curated pipelines can be poisoned upstream (Split-view, Frontrunning, compromised contributors). Second, frontier model training requires web-scale data — billions to trillions of tokens — that no single broker can supply, which pushes labs back to scraping. Brokers reduce risk for fine-tuning and domain-specific training but don't fix the pre-training problem.
+
+
+## LLM05: Improper Output Handling
+
+Lack of proper sanitization and validation of model-generated output before it moves downstream results in improper output handling. The attacker exploits the trust relationship between the application and the model to carry out attacks on downstream components — browsers, databases, shell environments, file systems, and APIs the application talks to.
+
+This is not an attack on the model itself. The model behaves normally; the vulnerability lies in the application that takes the model's output and passes it to a sensitive downstream system without validation. Classic injection vulnerabilities — XSS, CSRF, SSRF, SQL injection, command injection, path traversal — all reappear here, with the LLM serving as the new attacker-controlled input channel.
+
+There are effectively **two trust relationships at play**:
+
+1. Between the application and the model — the app trusts the model's output is safe to act on
+2. Between the AI provider and the user — the user trusts that what the system tells them is legitimate
+
+When output handling fails, both relationships get exploited.
+
+### Common attack scenarios
+
+**SQL injection via LLM output:** An LLM-powered analytics assistant translates natural-language questions into SQL. A user (malicious or merely careless) submits a question that causes the model to emit a destructive or extractive query. The application takes the SQL string and runs it directly against the database via string concatenation instead of treating it as untrusted output. The vulnerability is not that the user asked the wrong question — it's that the application trusted the model's output as safe SQL without parameterization or query validation.
+
+**XSS via LLM-generated HTML/JavaScript/Markdown:** The model produces output containing HTML, JavaScript, or markdown — sometimes legitimately, sometimes because an attacker injected instructions via an external source the model processed. The application returns that output directly to the browser without escaping. The browser interprets the content as code and executes it, leading to cross-site scripting. This is especially dangerous when the model is consuming external content (RAG documents, scraped web pages) because the attacker may have planted the malicious payload upstream.
+
+**Phishing via LLM-generated emails:** An application uses an LLM to generate customer-facing marketing or support emails. The attacker prompts the model into producing phishing-style text — "your account has been locked, please visit acme.org and log in with your remembered credentials." The application sends the email without validation. Both trust relationships break: the app trusted the model's output to be legitimate marketing copy, and the user trusts that messages from the platform are legitimate.
+
+**SSRF and command injection via tool calls:** When the model can invoke functions (e.g., fetch a URL, run a shell command, call an internal API) and the application executes those calls without authorization or sanitization, an attacker can manipulate the model into emitting calls to internal services, sensitive paths, or destructive commands. Touches LLM06 (excessive agency) territory.
+
+### Prevention and mitigation strategies
+
+**Zero-trust on model output:** Treat every output from the model as untrusted user input. Apply the same validation, sanitization, and encoding you would apply to data coming directly from a web form. The fact that an LLM produced the content gives it no privilege.
+
+**Parameterized queries for any database operation:** Never concatenate LLM output directly into SQL. If the model's role is to translate intent into SQL, the application should validate the resulting query against a strict schema or allow-list before execution.
+
+**Output encoding for downstream contexts:** Escape HTML, encode URL parameters, sanitize markdown — whatever is appropriate for the consuming surface. The application is responsible, not the model.
+
+**Content Security Policy (CSP):** Strict CSP headers limit what a browser will execute even if malicious content reaches it. CSP is the last line of defense against XSS — if the browser is told it can only execute scripts from specific domains and only render images from specific origins, an LLM-emitted script tag from an unexpected source gets blocked at the rendering layer.
+
+**Authorization checks on tool calls:** When the model can invoke functions, the application must enforce authorization based on the actual user — not based on what the model claims. The model is suggesting an action; the application decides whether to execute it.
+
+**Robust logging and monitoring:** Log model outputs and downstream actions. Anomaly detection on output patterns can flag exploitation attempts — sudden bursts of HTML tags, unusual SQL keywords, unexpected outbound URLs.
+
+### Real world examples
+
+- **AnythingLLM — XSS to RCE chain** — Researchers demonstrated escalating an injection flaw in the chat renderer of AnythingLLM Desktop into full remote code execution on the host. The desktop app's chat surface rendered LLM output without proper restriction, and the renderer's privileges enabled the chain from XSS up to host compromise.
+- **ChatGPT image markdown data exfiltration** — The ChatGPT web interface automatically rendered markdown image tags emitted by the model. The interface did not restrict the model from constructing URLs that embedded sensitive conversation data as query parameters. An indirect prompt injection could instruct the model to emit a markdown image whose URL pointed to an attacker server, exfiltrating user data through the image load. Fixed once disclosed.
+
+### Open question for me
+
+Where exactly should output validation live in a modern LLM application — at the model wrapper layer, at the API gateway, or per-consumer (browser-side, DB-side, shell-side)? Revisit when I work through the PortSwigger insecure output handling lab in Week 2.
