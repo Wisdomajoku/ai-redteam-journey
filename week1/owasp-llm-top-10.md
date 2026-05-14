@@ -228,3 +228,42 @@ When output handling fails, both relationships get exploited.
 ### Open question for me
 
 Where exactly should output validation live in a modern LLM application — at the model wrapper layer, at the API gateway, or per-consumer (browser-side, DB-side, shell-side)? Revisit when I work through the PortSwigger insecure output handling lab in Week 2.
+
+
+## LLM06: Excessive Agency
+
+"Agency" is the ability of the AI to act. There is a difference between the AI saying "you should delete this" and the AI deleting it directly. Developers often grant some degree of agency to AI systems, especially when the system is doing automation work or acting as an agent.
+
+Excessive agency is the vulnerability that arises when an AI system has more capability, permission, or autonomy than its job actually requires. The risk is that an attacker (through prompt injection, manipulated retrieved content, or compromised tool inputs) can convert that excess into real-world harm.
+
+Excessive agency can violate every property of the CIA triad. Confidentiality breaks when an over-permissioned model reads or exfiltrates data it should not access. Integrity breaks when an over-autonomous model writes, modifies, or deletes data without human checks. Availability breaks when an over-functional model can destroy or disable systems. The three "excesses" below are independent dimensions; any of them can cause damage along any CIA axis depending on what the model is told (or tricked) to do.
+
+### The three excesses
+
+**Excessive functionality:** Giving an AI more tools than it needs. A model whose job is to summarize emails should not also have a tool to send emails, modify calendar entries, or run shell commands. Developers grant extra functionality for convenience or future flexibility, but each additional tool widens the attack surface. A common example: a developer wants the AI to run one specific network test, so they give it a shell tool. The model now has the ability to run arbitrary commands, and an attacker who can influence the model's input can run `rm -rf /` or pull down malware.
+
+**Excessive permissions:** Even when the set of tools is correct, the permissions those tools run with may be too broad. An AI assistant that needs to read your calendar may be issued an OAuth token with `full_account_access` instead of `calendar.readonly`. If the model is then manipulated, it can wipe emails, change credentials, or delete appointments because the token allows it. The functionality (calendar access) is correct; the depth of access is wrong.
+
+**Excessive autonomy:** This is about how much human oversight sits between the model's decision and the real-world action. Autonomy is a spectrum. At one end the model only suggests, and a human decides. At the other end the model executes silently. Excessive autonomy means the system sits further up that ladder than its risk profile justifies. A spam filter executing silently is appropriate. A financial transfer or account deletion executing silently is not. The right autonomy level depends on the blast radius of the action, not on convenience or speed.
+
+These three excesses are independent but they compound. A real-world incident usually involves more than one (e.g. a tool the model didn't need, running with permissions it shouldn't have, executing without human confirmation).
+
+### Real world example
+
+**Google Workspace + Gemini indirect injection (researcher demonstrations, 2024):** Researchers showed that an attacker could send a target user a crafted email containing hidden instructions. When the user asked the AI assistant to "summarize my unread emails," the assistant processed the malicious email, treated its hidden instructions as user intent, and acted on them (for example, forwarding sensitive content to an attacker-controlled address). This is a compound failure: excessive permissions (the assistant could send mail, not just read), and excessive autonomy (it sent without explicit user confirmation). A correctly scoped assistant would have read-only access for summarization, and any outbound action would require a confirmation step.
+
+### Prevention and mitigation strategies
+
+**Require human approval for high-stakes actions.** Build human-in-the-loop gates into the workflow for actions that have meaningful blast radius: payments above a threshold, account deletions, mass mailings, infrastructure changes. The check can be rule-based ("any outgoing transaction $10,000 or above requires manager approval") or interaction-based (the AI surfaces the proposed action, the user confirms in a separate UI step before execution).
+
+**Minimize functionality.** Audit the tools the model has access to. If a function is not needed for the model's actual job, remove it. A summarization assistant does not need write access to mailboxes. An analytics assistant does not need credential rotation tools. Each tool removed reduces the attack surface.
+
+**Minimize permissions.** Apply least privilege to every tool the model uses. Scoped OAuth tokens, read-only database connections, time-limited credentials. The model and its tools should have only the rights needed to complete the specific task, no more.
+
+**Sandbox high-risk tools.** Where the model genuinely needs powerful tools (a shell, a code interpreter, a file system), run them in an isolated environment with no network access and no path to production systems. Treat the model's tool calls as untrusted input to those sandboxes.
+
+**Log and monitor every tool call.** Excessive-agency abuse usually produces detectable patterns: bursts of high-privilege actions, unusual outbound destinations, repeated attempts at the same restricted operation. Monitoring lets you catch attacks in progress instead of after the damage.
+
+### Open question for me
+
+How does an internal verification layer (the model checking its own reasoning before executing) hold up against excessive autonomy attacks? My current intuition is that verification helps but does not eliminate the risk, because the verification runs on the same model with the same training and shares the same context window as the original reasoning. If an attacker can manipulate the primary reasoning via prompt injection, they can usually manipulate the verification step too. True defense seems to require verification that lives outside the model: rule-based checks, a separate judge model with isolated context, or human gating for high-impact actions. Revisit during PyRIT work in Week 3 to test this empirically with multi-turn orchestrators.
