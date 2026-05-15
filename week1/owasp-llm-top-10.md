@@ -371,3 +371,62 @@ Is per-query identity verification at the retrieval layer practical at scale, gi
 **Efficiency angle:** Modern vector databases (Pinecone, Weaviate, Qdrant, pgvector) implement scoped retrieval efficiently through namespace partitioning and metadata filtering applied within the approximate nearest neighbor search. Overhead is typically 5 to 15 percent, which is acceptable for almost any production workload. The cost is far below the cost of a multi-tenant breach.
 
 **Architectural angle:** Identity verification should not live in the LLM. The LLM can be prompt-injected, has no reliable way to verify identity, and is the wrong layer for access control. Push enforcement down to the retrieval layer: the application authenticates the user, constructs scoped queries, and the LLM only ever consumes pre-filtered context. Defense in depth requires multiple layers, and the retrieval layer is the natural one for access control.
+
+
+## LLM09: Misinformation
+
+This category was formerly called Overreliance. The renaming is significant: it shifts the framing from the user's mistake (relying too heavily on the model) to the system's failure (producing inaccurate information in the first place). Both layers matter, but the rename emphasizes that the output is the problem to solve, not just the user's trust.
+
+Misinformation in this context is the model producing inaccurate, fabricated, or misleading output that the user or downstream system treats as truth. The consequences range from mild (wrong restaurant recommendation) to critical (incorrect medical advice, fabricated legal precedent, unsafe code shipped to production).
+
+### Causes of misinformation
+
+Hallucination is the most-cited cause but is not the only one. Misinformation has multiple distinct origins:
+
+**Hallucination:** The model generates plausible-sounding content that has no basis in its training data or in retrieved context. Models are configured to always produce a response, and when they lack grounding for a question, they fill the gap with confident-looking output. The model "finds logic where there is none."
+
+**Stale or incorrect training data:** The model accurately recalls something that was wrong or has since changed. This is not hallucination; the model is reproducing what it was taught.
+
+**Biased training data:** The model reproduces societal or sampling biases as if they were neutral facts.
+
+**Out-of-distribution queries:** The user asks something the model has not seen enough of in training. The model produces output that resembles in-distribution responses on similar topics but is functionally inaccurate.
+
+**Retrieval failures in RAG systems:** The retrieval layer surfaces irrelevant, outdated, or poisoned context. The model faithfully reproduces wrong context as if it were authoritative.
+
+Misinformation is the output category. The mechanisms above are the distinct pathways that lead to it. Mitigations differ by mechanism, so distinguishing them matters.
+
+### Why misinformation is dangerous
+
+Model outputs are typically smart-sounding, confident, and well-structured. This creates the illusion of accuracy. Users perceive the model as an expert, specialist, or well-versed in a field even when its response is largely fabricated. Overreliance compounds the problem: users do not verify, especially in high-stakes contexts where verification is most important.
+
+In high-stakes scenarios (medical, legal, financial, code generation, infrastructure decisions), models should assist, not act alone. This is the architectural argument for human in the loop. Speed is often cited as a trade-off, but in high-stakes contexts the cost of a wrong decision dwarfs the cost of an extra verification step.
+
+### Specific risk: unsafe code generation
+
+Worth calling out separately because of severity. A model that confidently generates production-grade code using deprecated libraries, vulnerable patterns, or insecure defaults can introduce vulnerabilities directly into a codebase. The chain reaction matters: the same flawed pattern can propagate across an organization if developers copy-paste from the model without review. Code from LLMs needs the same review discipline as code from a junior developer, not less.
+
+### Prevention and mitigation strategies
+
+**Retrieval Augmented Generation (RAG):** Ground model outputs in retrievable, verifiable sources. RAG reduces hallucination because the model is producing content based on retrieved context rather than parametric memory alone. Important nuance: RAG does not eliminate misinformation, it relocates the failure mode. Without RAG, the model hallucinates from training data. With RAG, the model can still hallucinate, or it can faithfully reproduce wrong retrieved context (LLM08 territory). RAG is necessary for many systems but is not the fix on its own.
+
+**Domain-specific fine-tuning:** Methods like LoRA and other parameter-efficient fine-tuning techniques can improve a model's accuracy on a specific domain by exposing it to curated, verified content. This reduces certain classes of hallucination but does not eliminate them and can introduce new risks (LLM03 supply chain, LLM04 data poisoning).
+
+**Chain-of-Thought (CoT) prompting:** A prompting technique, distinct from fine-tuning. Asking the model to reason step by step reduces some classes of reasoning errors and surfaces the model's logic for inspection. Useful for reducing certain logic errors but does not address training data accuracy.
+
+**Cross-verification and human oversight:** The strongest single mitigation. Users and downstream systems should cross-check model output against independent sources before acting on it. Speed is the cited trade-off; in high-stakes contexts the risk far exceeds the trade-off. Human in the loop also serves a secondary purpose: it shifts liability appropriately between model provider and user.
+
+**Transparent disclosure:** Providers should disclose model capabilities, limitations, and known failure modes to users. This is a requirement under the EU AI Act for high-risk AI systems and is also a reasonable practice for any production deployment. Transparency does not prevent misinformation but enables users to calibrate trust appropriately.
+
+**Automated validation:** Output validators, fact-checking against trusted sources, citation verification, and confidence calibration can catch a fraction of misinformation before it reaches the user. These complement manual verification, not replace it.
+
+### Real world examples
+
+**Mata v. Avianca (June 2023):** A New York attorney, Steven Schwartz, used ChatGPT to research legal precedents for a personal injury case. ChatGPT generated a list of past cases that sounded legitimate, with names, docket numbers, and judges' opinions. The cases were entirely fabricated. When opposing counsel could not find the cited cases, the fabrication came to light. The attorney was sanctioned. This is the canonical case study for legal misinformation and lawyer overreliance.
+
+**Air Canada chatbot (2024):** Air Canada's chatbot provided a customer with inaccurate refund policy information regarding bereavement fares. The customer relied on the chatbot's response, only to be denied the refund later. The case went to small claims tribunal, which ruled Air Canada was responsible for its chatbot's output and ordered them to honor the misinformation. Established legal precedent that companies are liable for their AI's statements.
+
+**Google Bard JWST demo (February 2023):** During the first public demo of Google's AI Bard, the model claimed the James Webb Space Telescope took the first picture of a planet outside our solar system. Astronomers pointed out the first such image was actually taken by the Very Large Telescope in 2004. The error contributed to Alphabet losing approximately $100 billion in market value in a single day. Illustrates that even minor factual errors from high-profile AI systems carry significant business consequences.
+
+### Open question for me
+
+Given that misinformation has multiple distinct causes (hallucination, stale training data, biased data, retrieval failure), is there a way to detect which cause produced a given wrong output? This matters because the right mitigation differs by cause. Revisit when working with PyRIT in Week 3, specifically to see if scorers can distinguish hallucinations from faithful-to-bad-context errors.
