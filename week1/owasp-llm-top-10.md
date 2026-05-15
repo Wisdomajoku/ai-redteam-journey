@@ -430,3 +430,75 @@ Worth calling out separately because of severity. A model that confidently gener
 ### Open question for me
 
 Given that misinformation has multiple distinct causes (hallucination, stale training data, biased data, retrieval failure), is there a way to detect which cause produced a given wrong output? This matters because the right mitigation differs by cause. Revisit when working with PyRIT in Week 3, specifically to see if scorers can distinguish hallucinations from faithful-to-bad-context errors.
+
+
+## LLM10: Unbounded Consumption
+
+Unbounded consumption is the vulnerability category covering attacks that exploit the absence of limits on how an LLM system is used. The category replaces and broadens what was previously called Model Denial of Service. It now covers three distinct attack types plus a fourth subcategory that crosses them:
+
+1. **Denial of Service (DoS):** Availability attacks that take the service down for legitimate users.
+2. **Denial of Wallet (DoW):** Economic attacks that drive up the victim's costs without necessarily affecting availability.
+3. **Model extraction:** Confidentiality attacks against the model itself as intellectual property.
+4. **Infinite loops and runaway tasks:** A subcategory that produces DoS or DoW effects through recursive or unbounded operations.
+
+Mitigations differ per attack type. Treating them as one undifferentiated risk leads to incomplete defenses.
+
+### Denial of Service
+
+The classic resource exhaustion attack applied to LLM endpoints. The attacker floods the endpoint with requests, sends inputs at maximum context window size, or chains operations to exhaust compute. Legitimate users either cannot get responses or experience degraded latency. This violates the availability property of the CIA triad and is the closest analog to traditional DoS attacks on web infrastructure.
+
+### Denial of Wallet
+
+A novel attack class specific to pay-per-token LLM APIs. The attacker is not trying to take the service down. They are trying to make it expensive enough to be unsustainable. A few thousand long-context requests against frontier models (Opus, GPT-5, Gemini Advanced) can cost the victim thousands of dollars in hours. For startups operating on tight margins, this can be existential. The attack is particularly insidious because the system technically performs as designed: every request returns a valid response and is correctly billed.
+
+### Model extraction
+
+The attacker treats the target model as a teacher and queries it systematically to reconstruct its behavior. Captured input-output pairs are used to train a smaller "student" model that approximates the teacher's capabilities. This is called knowledge distillation when used legitimately, model extraction or stealing when used adversarially. The attacker invests a few thousand dollars in API calls to partially replicate millions of dollars of training investment. The technique was formalized in the 2016 paper "Stealing Machine Learning Models via Prediction APIs" by Tramèr et al., and the commercial concern resurfaced sharply in 2024 and 2025 with widespread reports of frontier model behavior being distilled by competing labs.
+
+### Infinite loops and runaway tasks
+
+Specific to agentic systems or models with tool access. The attacker constructs a prompt that causes the model to enter a recursive task with no termination condition. Examples include impossible constraint satisfaction ("plan a route flying only east where each connecting city is west of the last"), self-referential generation ("write the longest sentence that contains itself as a substring"), or tool loops where each tool call generates the conditions for another call. Within minutes, the victim's monthly API budget can be exhausted.
+
+### Prevention and mitigation strategies grouped by attack type
+
+**Against Denial of Service:**
+
+- Rate limiting per user, IP address, and API key to cap requests per unit time
+- Maximum input size validation to prevent context window exhaustion attacks
+- Graceful degradation: drop response quality before dropping the service entirely, preserving critical functionality under load
+- Glitch token handling: train the model to handle rare or adversarial tokens (such as the SolidGoldMagikarp class of inputs discovered in GPT-3) without entering undefined states that crash inference
+
+**Against Denial of Wallet:**
+
+- Cost caps per user account, enforced at the API gateway before requests reach the model
+- Per-user query quotas independent of payment tier
+- Cost anomaly alerting that flags unusual spending patterns in real time
+- Tiered access models that allow stricter limits on free or low-trust accounts
+
+**Against Model Extraction:**
+
+- Query pattern monitoring that flags high volumes of diverse queries from a single source, especially queries that probe model boundaries systematically
+- Output watermarking that allows the provider to identify when a derivative model was trained on their outputs
+- Response perturbation: introducing small calibrated randomness into outputs that does not affect user experience but breaks the consistency required for high-quality distillation
+- Contractual enforcement through terms of service that prohibit use of outputs for training competing models, with monitoring to detect violations
+
+**Against Infinite Loops:**
+
+- Hard output token limits on every response
+- Maximum iteration counts on agentic loops and tool-calling sequences
+- Timeout enforcement on long-running operations
+- Detection of recursive patterns in model output during generation, with early termination
+
+### Real world examples
+
+**Education startup AI tutor (illustrative):** Within 48 hours of launch, automated scripts submitted thousands of requests for 50-page study guides on obscure topics. The startup's pay-per-token costs spiked to multiple thousands of dollars before they noticed and added rate limits. A representative example of Denial of Wallet against unprotected APIs.
+
+**Travel agent infinite loop (illustrative):** A user prompted an agentic travel bot with "Plan a trip flying only east, but each connecting city must be west of the last." The agent recursively searched for routes satisfying the impossible constraint, generating thousands of API calls per minute before hitting a hard timeout. Illustrates the unbounded consumption risk in autonomous agent systems without iteration limits.
+
+**Claude Pro rate limiting (real and ongoing):** Anthropic enforces daily and weekly usage cycles on Claude Pro accounts. Users cannot consume infinite tokens regardless of subscription. This is rate limiting and quota management applied at the consumer plan level, and it is the same mitigation pattern that production LLM applications should apply to their own users.
+
+**Model extraction concerns (2024-2025 industry reporting):** Multiple reports through 2024 and 2025 alleged that several competing AI labs distilled frontier model behavior by querying commercial APIs at scale and training derivative models on the responses. The commercial sensitivity of these allegations elevated model extraction from an academic concern to an active competitive risk.
+
+### Open question for me
+
+Of the four attack types in this category, model extraction is the hardest to detect in real time, because individual queries can look legitimate. What detection signals actually work in production? Revisit during Garak labs in Week 3 to see if any of its probes test for the patterns associated with extraction attacks.
