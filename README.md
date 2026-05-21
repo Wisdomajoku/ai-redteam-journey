@@ -8,7 +8,7 @@ This is the working library behind my engagements.
 
 ### Framework material — [`week1/`](./week1)
 
-- [OWASP LLM Top 10 writeups](./week1) — analytical notes on each of the 10 categories (2025 edition), with context for how each shows up in real-world LLM applications
+- [OWASP LLM Top 10 writeups](./week1/owasp-llm-top-10.md) — analytical notes on each of the 10 categories (2025 edition), with context for how each shows up in real-world LLM applications
 - [`owasp-atlas-crossmap.md`](./week1/owasp-atlas-crossmap.md) — cross-mapping document linking the OWASP LLM Top 10 to corresponding MITRE ATLAS techniques (v5.4.0), with case study references and identified gaps
 
 ### Tool operator's guides — [`week2/tools/`](./week2/tools)
