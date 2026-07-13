@@ -1,6 +1,6 @@
-# Microsoft "Lessons from Red Teaming 100 Generative AI Products" — Reading Notes
+# Microsoft "Lessons from Red Teaming 100 Generative AI Products" - Reading Notes
 
-*Reading completed: May 21, 2026. Source: Microsoft AI Red Team — "Lessons from Red Teaming 100 Generative AI Products."*
+*Reading completed: May 21, 2026. Source: Microsoft AI Red Team - "Lessons from Red Teaming 100 Generative AI Products."*
 
 ---
 
