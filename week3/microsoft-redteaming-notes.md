@@ -6,7 +6,7 @@
 
 ## Lesson 1: Understand What the System Can Do and Where It Is Applied
 
-This is reconnaissance. The same discipline traditional security demands before any engagement — understand the system you are up against instead of blind testing or spray and pray. Microsoft's team was not making baseless assumptions but informed ones grounded in system understanding.
+This is reconnaissance. The same discipline traditional security demands before any engagement - understand the system you are up against instead of blind testing or spray and pray. Microsoft's team was not making baseless assumptions but informed ones grounded in system understanding.
 
 **The core questions to ask first:**
 
