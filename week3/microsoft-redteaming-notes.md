@@ -27,7 +27,7 @@ Notice the framing here: vulnerabilities arise from the capabilities chosen for 
 
 ### Downstream Applications
 
-Downstream application means taking a trained base model and narrowing it by deploying it into a specific use case, sometimes through fine-tuning (PEFT, LoRA, etc.). The impact on downstream use cases cannot be fully or conclusively assessed at the base model level.
+Downstream application means taking a trained base model and narrowing it by deploying it into a specific use case, sometimes through fine-tuning such as PEFT (e.g, LoRA, etc.). The impact on downstream use cases cannot be fully or conclusively assessed at the base model level.
 
 Example: the same model used for text-based research can also be used to run a phishing campaign by a malicious actor. One model, multiple uses - legitimate use and misuse. This is a significant gap in how we currently evaluate AI system risk.
 
