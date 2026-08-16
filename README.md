@@ -48,6 +48,11 @@ Executed a full simulated security assessment against a vulnerable-by-design age
 
 *   **Published Case Study:** [The Illusion of Prompt-Based Security: Exploiting Broken Object-Level Authorization (BOLA) in AI Agent Architectures](https://medium.com/@wisdomajokuu/the-illusion-of-prompt-based-security-exploiting-broken-object-level-authorization-bola-in-ai-fcf8b6156c9e?sharedUserId=wisdomajokuu)
 
+### 3. Damn Vulnerable MCP Server Security Walkthrough: [`dvmcp-security-walkthrough/`](./dvmcp-security-walkthrough)
+
+Worked through all 10 challenges in DVMCP, a Docker-based lab built around the OWASP MCP Top 10 taxonomy. Combined black-box testing through an MCP client (Cline) with source code review to confirm root cause on each finding, covering unprotected resource disclosure, command chaining injection, path traversal, stateful tool rug pulls, tool shadowing, indirect prompt injection, predictable token generation, arbitrary code execution via `eval()`, and authentication bypass via truthiness checks.
+
+*   **Published Case Study:** [Hands-On MCP Security: How I Exploited All 10 Challenges in Damn Vulnerable MCP Server](https://medium.com/@wisdomajokuu/hands-on-mcp-security-how-i-exploited-all-10-challenges-in-damn-vulnerable-mcp-server-81db94330406)
 ---
 
 ## How I use this repository
@@ -71,4 +76,4 @@ Reach me on LinkedIn ([linkedin.com/in/wisdomaj](https://linkedin.com/in/wisdoma
 
 ---
 
-*Last updated: July 20, 2026*
+*Last updated: August 16, 2026*
