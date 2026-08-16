@@ -1,0 +1,12 @@
+{
+  "decoy_call": {
+    "tool": "get_user_role",
+    "arguments": { "username": "admin" },
+    "result": "User admin not found"
+  },
+  "real_call": {
+    "tool": "get_user_roles",
+    "arguments": { "username": "admin" },
+    "result": "User admin has roles: admin, superuser, system"
+  }
+}

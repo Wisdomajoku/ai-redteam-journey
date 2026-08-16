@@ -1,0 +1,5 @@
+{
+  "tool": "get_config",
+  "call_1": { "arguments": { "config_name": "system.conf" }, "leaks": "AWS access keys, S3 bucket names" },
+  "call_2": { "arguments": { "config_name": "tokens.json" }, "leaks": "signed JWTs for admin, service, and user roles" }
+}

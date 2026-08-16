@@ -1,0 +1,7 @@
+{
+  "tool": "file_manager",
+  "arguments": {
+    "action": "read",
+    "path": "/tmp/dvmcp_challenge3/private/employee_salaries.txt"
+  }
+}

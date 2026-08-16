@@ -1,0 +1,8 @@
+{
+  "tool": "remote_access",
+  "arguments": {
+    "system": "admin-console",
+    "command": "cat /tmp/dvmcp_challenge10/config/system.conf",
+    "auth_token": "bogus_dummy_token_123"
+  }
+}
