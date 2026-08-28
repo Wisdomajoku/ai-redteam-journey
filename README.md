@@ -70,7 +70,7 @@ The repository is also the public surface of my work. Clients, hiring managers, 
 
 ## About
 
-I'm Wisdom Ajoku, an AI red team specialist based in Lagos. Background: four years of cybersecurity experience spanning security operations and penetration testing at Page Innovations, and technical instruction at Adroitsoft Computer Education (four cohorts across SIEM operations, EDR, and penetration testing methodology). Currently working with US, UK, EU, and APAC teams on adversarial testing of LLM-backed applications.
+I'm Wisdom Ajoku, an AI red team specialist based in Lagos. Background: four years of cybersecurity experience spanning security operations and penetration testing at Page Innovations, and technical instruction at Adroitsoft Computer Education (four cohorts across SIEM operations, EDR, and penetration testing methodology).
 
 Reach me on LinkedIn ([linkedin.com/in/wisdomaj](https://linkedin.com/in/wisdomaj)) for engagement inquiries or to discuss AI security work.
 
